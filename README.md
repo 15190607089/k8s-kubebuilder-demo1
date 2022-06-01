@@ -5,22 +5,20 @@
 
 ## 环境
 
-- kubebuilder: v3.0.0
-- kubernetes api: v1.19.2
+- kubebuilder: v3.2.0
+- kubernetes api: v1.22.1
 
 ---
 
 ## 项目初始化
 
 ```bash
-# 初始化 go mod
-go mod init github.com/schwarzeni/kubebuilder-imoocpo
 
 # 初始化项目骨架
-kubebuilder init --domain schwarzeni.github.com
+kubebuilder init --domain houyazhen.com --repo kubebuilderdemo
 
 # 初始化 CRD，两个确认都是 y
-kubebuilder create api --group batch --version v1alpha1 --kind ImoocPod
+kubebuilder create api --group webapp --version v1 --kind Guestbook
 ```
 
 此时 kubebuilder 已经生成了相关的项目骨架和代码文件
@@ -33,7 +31,7 @@ kubebuilder create api --group batch --version v1alpha1 --kind ImoocPod
 ├── api
 │   └── v1alpha1
 │       ├── groupversion_info.go
-│       ├── imoocpod_types.go
+│       ├── guestbook_types.go
 │       └── zz_generated.deepcopy.go
 ├── bin
 │   └── controller-gen
@@ -42,8 +40,8 @@ kubebuilder create api --group batch --version v1alpha1 --kind ImoocPod
 │   │   ├── kustomization.yaml
 │   │   ├── kustomizeconfig.yaml
 │   │   └── patches
-│   │       ├── cainjection_in_imoocpods.yaml
-│   │       └── webhook_in_imoocpods.yaml
+│   │       ├── cainjection_in_guestbooks.yaml
+│   │       └── webhook_in_guestbooks.yaml
 │   ├── default
 │   │   ├── kustomization.yaml
 │   │   ├── manager_auth_proxy_patch.yaml
@@ -57,9 +55,9 @@ kubebuilder create api --group batch --version v1alpha1 --kind ImoocPod
 │   ├── rbac
 │   │   └── ...
 │   └── samples
-│       └── batch_v1alpha1_imoocpod.yaml
+│       └── batch_v1alpha1_guestbook.yaml
 ├── controllers
-│   ├── imoocpod_controller.go
+│   ├── guestbook_controller.go
 │   └── suite_test.go
 ├── go.mod
 ├── go.sum
@@ -69,7 +67,7 @@ kubebuilder create api --group batch --version v1alpha1 --kind ImoocPod
 
 ```
 
-`api/v1alpha1/imoocpod_types.go` 定义了 ImoocPod 的 CRD，执行命令如下命令生成 CRD 定义的 yaml 文件，文件位置在 `config/crd/bases/batch.schwarzeni.github.com_imoocpods.yaml`
+`api/v1alpha1/guestbook_types.go` 定义了 Guestbook 的 CRD，执行命令如下命令生成 CRD 定义的 yaml 文件，文件位置在 `config/crd/bases/batch.schwarzeni.github.com_guestbooks.yaml`
 
 ```bash
 make manifests
@@ -78,7 +76,7 @@ make manifests
 之后使用 kubectl 将此 CRD 定义 apply 到 k8s 上
 
 ```bash
-kubectl apply -f config/crd/bases/batch.schwarzeni.github.com_imoocpods.yaml
+kubectl apply -f config/crd/bases/batch.schwarzeni.github.com_guestbooks.yaml
 ```
 
 执行如下命令在本地运行 controller
