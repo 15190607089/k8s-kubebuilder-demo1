@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
+	v13 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,6 +31,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // GuestbookReconciler reconciles a Guestbook object
@@ -124,6 +127,40 @@ func (r *GuestbookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
+	if len(existPodNames) != 0 {
+		serviceList := &v1.ServiceList{}
+		l := labels.Set{"service": instance.Name}
+		if err := r.Client.List(ctx, serviceList, &client.ListOptions{Namespace: instance.Namespace, LabelSelector: labels.SelectorFromSet(l)}); err != nil {
+			logger.Error(err, "fetching existing service failed")
+			return ctrl.Result{}, err
+		}
+		if len(serviceList.Items) == 0 {
+			svc := newServiceForCR(instance)
+			err := r.Client.Create(ctx, svc)
+			if err != nil {
+				logger.Info("create service failed")
+				return ctrl.Result{}, err
+			}
+			logger.Info("create service successfully")
+		} else {
+			logger.Info("service  is exist")
+		}
+	} else if len(existPodNames) == 0 {
+		serviceList := &v1.ServiceList{}
+		l := labels.Set{"service": instance.Name}
+		if err := r.Client.List(ctx, serviceList, &client.ListOptions{Namespace: instance.Namespace, LabelSelector: labels.SelectorFromSet(l)}); err != nil {
+			logger.Error(err, "fetching existing service failed")
+			return ctrl.Result{}, err
+		}
+		for _, v := range serviceList.Items {
+			err := r.Client.Delete(ctx, &v)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			logger.Info("pod is 0,delete service successful")
+		}
+	}
+
 	return ctrl.Result{Requeue: true}, nil
 }
 
@@ -145,6 +182,31 @@ func newPodForCR(cr *webappv1.Guestbook) *v1.Pod {
 			},
 		},
 	}
+}
+
+func newServiceForCR(cr *webappv1.Guestbook) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: v12.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+			Labels:    map[string]string{"service": cr.Name},
+			OwnerReferences: []v12.OwnerReference{
+				*v12.NewControllerRef(cr, v12.SchemeGroupVersion.WithKind("service")),
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     cr.Name,
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				},
+			},
+			Selector: map[string]string{
+				"app": cr.Name,
+			},
+		},
+	}
 
 }
 
@@ -153,5 +215,7 @@ func (r *GuestbookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&webappv1.Guestbook{}).
 		Owns(&v1.Pod{}).
+		Watches(&source.Kind{Type: &v1.Service{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &v13.Ingress{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
